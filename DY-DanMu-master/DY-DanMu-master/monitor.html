@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斗鱼弹幕实时监控</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        h1 {
+            color: #ff5d23;
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+
+        .current-room-info {
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 15px;
+            background-color: #fff3e0;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ffe0b2;
+        }
+
+        .room-id-highlight {
+            color: #ff5d23;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 0 5px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .control-panel {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        #rid-input {
+            padding: 8px;
+            border: 1px solid #90caf9;
+            border-radius: 4px;
+            width: 120px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: white;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #2196f3;
+        }
+
+        .btn-primary:hover {
+            background-color: #1976d2;
+        }
+
+        .btn-success {
+            background-color: #4CAF50;
+        }
+
+        .btn-success:hover {
+            background-color: #388E3C;
+        }
+
+        .btn-danger {
+            background-color: #f44336;
+        }
+
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+
+        /* 弹幕列表区域 */
+        .danmu-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: #fafafa;
+            padding: 0;
+            position: relative;
+        }
+
+        #danmu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .danmu-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: flex-start;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .danmu-item:nth-child(even) {
+            background-color: #fff;
+        }
+
+        .time {
+            color: #999;
+            font-size: 12px;
+            margin-right: 10px;
+            min-width: 65px;
+            flex-shrink: 0;
+        }
+
+        .user {
+            color: #007bff;
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 80px;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .content {
+            color: #333;
+            word-break: break-all;
+        }
+
+        .loading {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+
+        /* 滚动到底部按钮 */
+        #scroll-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(33, 150, 243, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        #scroll-btn:hover {
+            background-color: #2196f3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📺 斗鱼弹幕实时监控</h1>
+
+        <div class="current-room-info">
+            当前正在监控直播间: <span id="current-rid-display" class="room-id-highlight">-</span>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="total-count">-</div>
+                <div class="stat-label">弹幕总数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="status">连接中...</div>
+                <div class="stat-label">状态</div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <input type="text" id="rid-input" placeholder="输入房间号">
+            <button onclick="updateRid()" class="btn btn-primary">切换房间</button>
+            <button onclick="exportForAI()" class="btn btn-success">📥 导出 AI 分析数据</button>
+            <button onclick="shutdownSystem()" class="btn btn-danger">❌ 关闭系统</button>
+        </div>
+
+        <div class="danmu-container" id="danmu-container">
+            <ul id="danmu-list">
+                <div class="loading">等待数据...</div>
+            </ul>
+            <button id="scroll-btn" onclick="scrollToBottom()">⬇</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080';
+        let currentRid = '';
+        let danmuSet = new Set(); // 用于去重
+        let isAutoScroll = true;  // 是否自动滚动
+        const MAX_ITEMS = 500;    // 列表最大保留数量
+
+        const container = document.getElementById('danmu-container');
+        const list = document.getElementById('danmu-list');
+        const scrollBtn = document.getElementById('scroll-btn');
+
+        // 监听滚动事件
+        container.addEventListener('scroll', () => {
+            // 如果距离底部超过 50px，则停止自动滚动
+            if (container.scrollHeight - container.scrollTop - container.clientHeight > 50) {
+                isAutoScroll = false;
+                scrollBtn.style.display = 'flex';
+            } else {
+                isAutoScroll = true;
+                scrollBtn.style.display = 'none';
+            }
+        });
+
+        function scrollToBottom() {
+            container.scrollTop = container.scrollHeight;
+            isAutoScroll = true;
+            scrollBtn.style.display = 'none';
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        function generateId(item) {
+            return `${item.Payload.cst}-${item.Payload.nn}-${item.Payload.txt}`;
+        }
+
+        async function fetchCurrentRid() {
+            try {
+                const response = await fetch(`${API_BASE}/config/current_rid`);
+                const data = await response.json();
+                if (data.code === 200 && data.rid) {
+                    currentRid = data.rid;
+                    document.getElementById('current-rid-display').textContent = currentRid;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchStats() {
+            try {
+                const response = await fetch(`${API_BASE}/search/Count`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ EndTime: Date.now() })
+                });
+                const data = await response.json();
+                if (data.code === 200) {
+                    document.getElementById('total-count').textContent = data.data.Count;
+                    document.getElementById('status').textContent = '运行中 🟢';
+                    document.getElementById('status').style.color = 'green';
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').textContent = '连接失败 🔴';
+                document.getElementById('status').style.color = 'red';
+            }
+        }
+
+        async function fetchDanmu() {
+            try {
+                const body = { From: 0 };
+                if (currentRid) {
+                    body.rid = currentRid;
+                }
+                // 请求最新的 20 条
+                const response = await fetch(`${API_BASE}/search/all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+
+                if (data.code === 200 && data.data.result_list) {
+                    // 移除 loading
+                    const loading = list.querySelector('.loading');
+                    if (loading) loading.remove();
+
+                    // API 返回的是倒序（最新的在前），我们需要反转顺序，把旧的先加进去（如果还没加的话）
+                    // 但实际上我们是追加到底部，所以应该把最新的加到底部。
+                    // 这里的逻辑是：API 返回 [新1, 新2, 新3...]
+                    // 我们应该按 [新3, 新2, 新1] 的顺序追加到底部。
+                    const items = data.data.result_list.reverse();
+
+                    let hasNew = false;
+                    items.forEach(item => {
+                        const id = generateId(item);
+                        if (!danmuSet.has(id)) {
+                            danmuSet.add(id);
+                            hasNew = true;
+
+                            const li = document.createElement('li');
+                            li.className = 'danmu-item';
+                            li.innerHTML = `
+                                <span class="time">${formatTime(item.Payload.cst)}</span>
+                                <span class="user">${item.Payload.nn}</span>
+                                <span class="content">${item.Payload.txt}</span>
+                            `;
+                            list.appendChild(li);
+                        }
+                    });
+
+                    // 限制列表长度
+                    while (list.children.length > MAX_ITEMS) {
+                        const first = list.firstElementChild;
+                        // 尝试从 Set 中移除（虽然很难精确找到对应的 key，但为了内存不泄露，这里简化处理）
+                        // 实际生产中可能需要维护一个队列来同步删除 Set
+                        list.removeChild(first);
+                    }
+
+                    // 自动滚动
+                    if (hasNew && isAutoScroll) {
+                        scrollToBottom();
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function updateRid() {
+            const rid = document.getElementById('rid-input').value;
+            if (!rid) {
+                alert('请输入直播间 ID');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/config/rid`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rid: rid })
+                });
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert(data.msg);
+                    currentRid = rid;
+                    document.getElementById('current-rid-display').textContent = currentRid;
+                    document.getElementById('rid-input').value = '';
+
+                    // 切换房间时，清空列表
+                    list.innerHTML = '<div class="loading">正在切换房间并等待新弹幕...</div>';
+                    danmuSet.clear();
+                    isAutoScroll = true;
+                } else {
+                    alert('更新失败: ' + data.msg);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('请求失败');
+            }
+        }
+
+        function exportForAI() {
+            let url = `${API_BASE}/export/ai`;
+            if (currentRid) {
+                url += `?rid=${currentRid}`;
+            }
+            window.location.href = url;
+        }
+
+        async function shutdownSystem() {
+            if (!confirm('确定要关闭所有服务并退出系统吗？')) {
+                return;
+            }
+            try {
+                await fetch(`${API_BASE}/system/shutdown`, { method: 'POST' });
+                alert('系统已发送关闭指令，页面将停止更新。');
+                document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;"><h1>系统已关闭</h1><p>您可以关闭此标签页了。</p></div>';
+            } catch (e) {
+                console.error(e);
+                alert('发送关闭指令失败，请手动关闭窗口。');
+            }
+        }
+
+        // 初始加载
+        fetchCurrentRid().then(() => {
+            fetchStats();
+            fetchDanmu();
+        });
+
+        // 定时刷新 (每2秒，加快一点)
+        setInterval(() => {
+            fetchStats();
+            fetchDanmu();
+        }, 2000);
+    </script>
+</body>
+
+</html>
